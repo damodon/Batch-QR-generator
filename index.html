@@ -288,6 +288,10 @@ https://amcal.members.epica.au/create-account?store_id=1003"></textarea>
           <option value="200" selected>Medium (200px)</option>
           <option value="300">Large (300px)</option>
           <option value="400">XL (400px)</option>
+          <option value="600">2x (600px)</option>
+          <option value="800">Hi-Res (800px)</option>
+          <option value="1000">Ultra (1000px)</option>
+          <option value="1200">Max (1200px)</option>
         </select>
       </div>
       <div class="option-group">
@@ -494,7 +498,7 @@ https://amcal.members.epica.au/create-account?store_id=1003"></textarea>
     item.className = 'qr-item';
     item.innerHTML = `
       <div class="qr-canvas-wrap">
-        <img src="${dataUrl}" width="160" height="160" style="border-radius:4px"/>
+        <img src="${dataUrl}" style="width:160px;height:160px;border-radius:4px;display:block;"/>
       </div>
       <div class="qr-filename">${escapeHtml(filename)}</div>
       <div class="qr-url-preview">${escapeHtml(truncate(url, 60))}</div>
