@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Batch QR Code Generator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f4f8;
+      min-height: 100vh;
+      padding: 32px 16px;
+      color: #2d3748;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.7rem;
+      font-weight: 700;
+      color: #1a202c;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: #718096;
+      font-size: 0.9rem;
+      margin-bottom: 28px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+      padding: 32px;
+      margin-bottom: 28px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 6px;
+    }
+
+    textarea {
+      width: 100%;
+      height: 180px;
+      padding: 12px 14px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.88rem;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      color: #2d3748;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+      line-height: 1.6;
+    }
+    textarea:focus { border-color: #667eea; }
+
+    .options-row {
+      display: flex;
+      gap: 16px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .option-group {
+      flex: 1;
+      min-width: 120px;
+    }
+
+    select, input[type="color"] {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      color: #2d3748;
+      background: white;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    select:focus { border-color: #667eea; }
+
+    input[type="color"] {
+      padding: 4px 6px;
+      height: 42px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      flex: 1;
+      min-width: 160px;
+      padding: 13px 20px;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.98); }
+    .btn:hover { opacity: 0.88; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white;
+    }
+
+    .btn-download {
+      background: #48bb78;
+      color: white;
+    }
+
+    .btn-clear {
+      background: #e2e8f0;
+      color: #4a5568;
+      flex: 0 0 auto;
+      min-width: auto;
+      padding: 13px 18px;
+    }
+
+    /* Status bar */
+    .status-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 16px;
+      background: #ebf8ff;
+      border: 1px solid #bee3f8;
+      border-radius: 8px;
+      margin-top: 16px;
+      font-size: 0.88rem;
+      color: #2b6cb0;
+    }
+    .status-bar.visible { display: flex; }
+    .status-bar.error { background: #fff5f5; border-color: #fed7d7; color: #c53030; }
+
+    /* Results section */
+    .results-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .results-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #1a202c;
+    }
+
+    .results-count {
+      font-size: 0.85rem;
+      color: #718096;
+      font-weight: 400;
+    }
+
+    /* QR Grid */
+    .qr-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 20px;
+    }
+
+    .qr-item {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+      padding: 20px 16px 14px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      transition: box-shadow 0.2s;
+    }
+    .qr-item:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+
+    .qr-item.error-item {
+      background: #fff5f5;
+      border: 1px solid #fed7d7;
+    }
+
+    .qr-canvas-wrap {
+      line-height: 0;
+    }
+    .qr-canvas-wrap canvas, .qr-canvas-wrap img {
+      display: block;
+      border-radius: 4px;
+    }
+
+    .qr-filename {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #2d3748;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    .qr-url-preview {
+      font-size: 0.72rem;
+      color: #a0aec0;
+      text-align: center;
+      word-break: break-all;
+      line-height: 1.4;
+    }
+
+    .qr-dl-btn {
+      padding: 6px 14px;
+      background: #667eea;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .qr-dl-btn:hover { opacity: 0.85; }
+
+    .error-label {
+      font-size: 0.8rem;
+      color: #c53030;
+      text-align: center;
+    }
+
+    /* Hidden scratch area for QR generation */
+    #qr-scratch {
+      position: absolute;
+      left: -9999px;
+      top: -9999px;
+      visibility: hidden;
+    }
+
+    .spinner {
+      width: 18px;
+      height: 18px;
+      border: 2px solid rgba(255,255,255,0.4);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .results-section { display: none; }
+    .results-section.visible { display: block; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Batch QR Code Generator</h1>
+  <p class="subtitle">Paste one URL per line — each QR code is named after the last number in its URL.</p>
+
+  <div class="card">
+    <label for="url-input">URLs <span style="font-weight:400;color:#a0aec0">(one per line)</span></label>
+    <textarea id="url-input" placeholder="https://amcal.members.epica.au/create-account?store_id=1001
+https://amcal.members.epica.au/create-account?store_id=1002
+https://amcal.members.epica.au/create-account?store_id=1003"></textarea>
+
+    <div class="options-row">
+      <div class="option-group">
+        <label for="size-select">QR Size</label>
+        <select id="size-select">
+          <option value="128">Small (128px)</option>
+          <option value="200" selected>Medium (200px)</option>
+          <option value="300">Large (300px)</option>
+          <option value="400">XL (400px)</option>
+        </select>
+      </div>
+      <div class="option-group">
+        <label for="color-pick">QR Colour</label>
+        <input type="color" id="color-pick" value="#000000" />
+      </div>
+      <div class="option-group">
+        <label for="bg-pick">Background</label>
+        <input type="color" id="bg-pick" value="#ffffff" />
+      </div>
+    </div>
+
+    <div id="status-bar" class="status-bar"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="generate-btn" onclick="generateBatch()">Generate QR Codes</button>
+      <button class="btn btn-download" id="download-btn" onclick="downloadZip()" disabled>⬇ Download All as ZIP</button>
+      <button class="btn btn-clear" onclick="clearAll()">Clear</button>
+    </div>
+  </div>
+
+  <div class="results-section" id="results-section">
+    <div class="results-header">
+      <div>
+        <span class="results-title">Generated QR Codes</span>
+        <span class="results-count" id="results-count"></span>
+      </div>
+    </div>
+    <div class="qr-grid" id="qr-grid"></div>
+  </div>
+</div>
+
+<!-- Scratch area for generating QR codes off-screen -->
+<div id="qr-scratch"></div>
+
+<script>
+  // Stores { filename, dataUrl } for each successful QR
+  let generatedItems = [];
+
+  function getFilename(url) {
+    // Find all numeric sequences in the URL, return the last one
+    const matches = url.match(/\d+/g);
+    if (matches && matches.length > 0) {
+      return matches[matches.length - 1] + '.png';
+    }
+    // Fallback: sanitise the URL path
+    try {
+      const u = new URL(url);
+      const sanitised = (u.hostname + u.pathname + u.search)
+        .replace(/[^a-z0-9]/gi, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '')
+        .slice(0, 40);
+      return sanitised + '.png';
+    } catch {
+      return 'qr_' + Date.now() + '.png';
+    }
+  }
+
+  function isValidUrl(str) {
+    try {
+      const u = new URL(str);
+      return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+      return false;
+    }
+  }
+
+  function setStatus(msg, type = 'info') {
+    const bar = document.getElementById('status-bar');
+    bar.textContent = msg;
+    bar.className = 'status-bar visible' + (type === 'error' ? ' error' : '');
+  }
+
+  function clearStatus() {
+    const bar = document.getElementById('status-bar');
+    bar.className = 'status-bar';
+  }
+
+  // Generate a single QR and return { filename, dataUrl } or null on error
+  function generateOneQR(url, size, colorDark, colorLight) {
+    return new Promise((resolve) => {
+      const scratch = document.getElementById('qr-scratch');
+      const div = document.createElement('div');
+      scratch.appendChild(div);
+
+      try {
+        new QRCode(div, {
+          text: url,
+          width: size,
+          height: size,
+          colorDark,
+          colorLight,
+          correctLevel: QRCode.CorrectLevel.H
+        });
+
+        // QRCode.js is synchronous — canvas should be ready
+        setTimeout(() => {
+          const canvas = div.querySelector('canvas');
+          const img = div.querySelector('img');
+          let dataUrl = null;
+
+          if (canvas) {
+            dataUrl = canvas.toDataURL('image/png');
+          } else if (img) {
+            // Some browsers get an <img> instead; draw onto a canvas
+            const c = document.createElement('canvas');
+            c.width = size;
+            c.height = size;
+            const ctx = c.getContext('2d');
+            ctx.drawImage(img, 0, 0);
+            dataUrl = c.toDataURL('image/png');
+          }
+
+          scratch.removeChild(div);
+          resolve(dataUrl);
+        }, 50);
+      } catch (e) {
+        scratch.removeChild(div);
+        resolve(null);
+      }
+    });
+  }
+
+  async function generateBatch() {
+    const raw = document.getElementById('url-input').value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    if (lines.length === 0) {
+      setStatus('Please paste at least one URL.', 'error');
+      return;
+    }
+
+    const size = parseInt(document.getElementById('size-select').value);
+    const colorDark = document.getElementById('color-pick').value;
+    const colorLight = document.getElementById('bg-pick').value;
+
+    const generateBtn = document.getElementById('generate-btn');
+    const downloadBtn = document.getElementById('download-btn');
+    generateBtn.disabled = true;
+    generateBtn.innerHTML = '<span class="spinner"></span> Generating…';
+    downloadBtn.disabled = true;
+    clearStatus();
+
+    generatedItems = [];
+    const grid = document.getElementById('qr-grid');
+    grid.innerHTML = '';
+
+    let successCount = 0;
+    let errorCount = 0;
+    const filenameCount = {}; // track duplicates
+
+    for (let i = 0; i < lines.length; i++) {
+      const url = lines[i];
+      setStatus(`Generating ${i + 1} of ${lines.length}…`);
+
+      if (!isValidUrl(url)) {
+        errorCount++;
+        appendErrorCard(url, 'Invalid URL — must start with http:// or https://');
+        continue;
+      }
+
+      const dataUrl = await generateOneQR(url, size, colorDark, colorLight);
+
+      if (!dataUrl) {
+        errorCount++;
+        appendErrorCard(url, 'QR generation failed');
+        continue;
+      }
+
+      // Resolve filename, handling duplicates
+      let filename = getFilename(url);
+      if (filenameCount[filename] !== undefined) {
+        filenameCount[filename]++;
+        filename = filename.replace('.png', `_${filenameCount[filename]}.png`);
+      } else {
+        filenameCount[filename] = 0;
+      }
+
+      generatedItems.push({ filename, dataUrl, url });
+      successCount++;
+      appendQRCard(filename, dataUrl, url);
+    }
+
+    // Show results
+    document.getElementById('results-section').classList.add('visible');
+    document.getElementById('results-count').textContent =
+      ` — ${successCount} generated${errorCount > 0 ? `, ${errorCount} failed` : ''}`;
+
+    generateBtn.disabled = false;
+    generateBtn.innerHTML = 'Generate QR Codes';
+
+    if (successCount > 0) {
+      downloadBtn.disabled = false;
+      setStatus(`✓ ${successCount} QR code${successCount !== 1 ? 's' : ''} ready.${errorCount > 0 ? ` ${errorCount} URL${errorCount !== 1 ? 's' : ''} had errors.` : ''}`);
+    } else {
+      setStatus('No valid URLs found. Please check your input.', 'error');
+    }
+  }
+
+  function appendQRCard(filename, dataUrl, url) {
+    const grid = document.getElementById('qr-grid');
+    const item = document.createElement('div');
+    item.className = 'qr-item';
+    item.innerHTML = `
+      <div class="qr-canvas-wrap">
+        <img src="${dataUrl}" width="160" height="160" style="border-radius:4px"/>
+      </div>
+      <div class="qr-filename">${escapeHtml(filename)}</div>
+      <div class="qr-url-preview">${escapeHtml(truncate(url, 60))}</div>
+      <button class="qr-dl-btn" onclick="downloadOne('${escapeAttr(dataUrl)}','${escapeAttr(filename)}')">⬇ Download</button>
+    `;
+    grid.appendChild(item);
+  }
+
+  function appendErrorCard(url, reason) {
+    const grid = document.getElementById('qr-grid');
+    const item = document.createElement('div');
+    item.className = 'qr-item error-item';
+    item.innerHTML = `
+      <div class="error-label">⚠ ${escapeHtml(reason)}</div>
+      <div class="qr-url-preview" style="color:#c53030">${escapeHtml(truncate(url, 60))}</div>
+    `;
+    grid.appendChild(item);
+  }
+
+  function downloadOne(dataUrl, filename) {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = dataUrl;
+    link.click();
+  }
+
+  async function downloadZip() {
+    if (generatedItems.length === 0) return;
+
+    const downloadBtn = document.getElementById('download-btn');
+    downloadBtn.disabled = true;
+    downloadBtn.innerHTML = '<span class="spinner"></span> Zipping…';
+
+    const zip = new JSZip();
+
+    generatedItems.forEach(({ filename, dataUrl }) => {
+      const base64 = dataUrl.split(',')[1];
+      zip.file(filename, base64, { base64: true });
+    });
+
+    try {
+      const blob = await zip.generateAsync({ type: 'blob' });
+      saveAs(blob, 'qr-codes.zip');
+    } catch (e) {
+      setStatus('ZIP creation failed: ' + e.message, 'error');
+    }
+
+    downloadBtn.disabled = false;
+    downloadBtn.innerHTML = '⬇ Download All as ZIP';
+  }
+
+  function clearAll() {
+    document.getElementById('url-input').value = '';
+    document.getElementById('qr-grid').innerHTML = '';
+    document.getElementById('results-section').classList.remove('visible');
+    document.getElementById('download-btn').disabled = true;
+    generatedItems = [];
+    clearStatus();
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function escapeAttr(s) {
+    return s.replace(/'/g,"\\'");
+  }
+  function truncate(s, n) {
+    return s.length > n ? s.slice(0, n) + '…' : s;
+  }
+</script>
+</body>
+</html>
